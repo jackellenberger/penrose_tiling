@@ -1,41 +1,53 @@
 "use strict";
-var phi=(1+Math.sqrt(5))/2;
-var a = document.getElementById("myCanvas");
-var c = a.getContext("2d");
+
+// const
+const phi=(1+Math.sqrt(5))/2;
+
+// init
+var domCanvas = document.getElementById("myCanvas");
+var canvas = domCanvas.getContext("2d");
+
 myCanvas.addEventListener("mousemove",moveMouse,false);
 myCanvas.addEventListener("mousedown",mouseDown,false);
-var drawKiteShape=true;
-var totalShapes=0;
-var shapeCoords=[[],[],[],[]]; //x coord, y coord, angle, type (0=kite, 1=dart)
-var vertX=0;
-var vertY=0;
-var ANG;
-var size=50;
-var finishMove=true;
-var showCurves=false;
+
+var text="Place a kite.";
+
+// states
+var animating=false; //set to true when animating to stop anything else happening
+var legalMode=false; //this mode will highlight an illegally placed tile
+var legalTiling=true; //set to false if in legal mode but no legal tiling
 var hideCurrent=false; //hide the shape at cursor when cursor is near tools
 var deleteShapeMode=false;
 var highlightMode=false;
+var showCurves=true;
 var fixedHighlightMode=false;
-var foundMatchingTiling=false;
+
+// global state
+var shapeCoords=[[],[],[],[]]; //x coord, y coord, angle, type (0=kite, 1=dart)
 var shapeMap=[[],[],[],[]]; //used to store a record of each shapes neighbour
-var totalHighlightedShapes=0;
-var highlightedShapeIndex=[];
 var highlightedShapeCoords=[[],[],[],[]];
-var totalFixedHighlightedShapes=0;
-var fixedHighlightedShapeIndex=[];
 var fixedHighlightedShapeCoords=[[],[],[],[],[]]; //fifth entry is the length of a side
 var fixedHighlightedShapeMap=[[],[],[],[]];
 var highlightedShapeMap=[[],[],[],[]];
 var tilingCentreX; //used to store the centre of highlighted tiling
 var tilingCentreY;
 var tilingDiameter; //store diamter of highlighted tiling
-var closestCoords=[[],[],[],[]]; //the coordinates of the closest matching tiling
 var shapesToAdd=[[],[],[],[]]; //used to store forced shapes
-var animating=false; //set to true when animating to stop anything else happening
-var legalMode=false; //this mode will highlight an illegally placed tile
-var legalTiling=true; //set to false if in legal mode but no legal tiling
-var text="Place a kite.";
+
+// uncategorized :grimace:
+var drawKiteShape=true;
+var totalShapes=0;
+var vertX=0;
+var vertY=0;
+var ANG;
+var size=50;
+var finishMove=true;
+var foundMatchingTiling=false;
+var totalHighlightedShapes=0;
+var highlightedShapeIndex=[];
+var totalFixedHighlightedShapes=0;
+var fixedHighlightedShapeIndex=[];
+var closestCoords=[[],[],[],[]]; //the coordinates of the closest matching tiling
 
 //used to check if we have a legal tiling
 var legalTilingCoords=[[],[],[],[]];
@@ -54,7 +66,9 @@ for (var i=0; i<9; i++) {
   deflateLegal();
   legalShapeMap=mapShapes(legalTilingCoords,totalLegalShapes,legalSize);
 }
-var translateX;         //used to map tiling onto inflated tiling
+
+//used to map tiling onto inflated tiling
+var translateX;
 var translateY;
 var rotateInflation;
 
@@ -62,20 +76,45 @@ var rotateInflation;
 drawButtons();
 displayMessage(text);
 
+// ########################################
+// UTILS
+// ########################################
+function distance(x1,y1,x2,y2) {
+  return Math.sqrt((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2));
+}
 
+function distanceSquared(x1,y1,x2,y2) { //dont use sqrt to save time
+  return ((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2));
+}
+
+// ########################################
+// UI
+// ########################################
 function moveMouse(e) {
   if (animating) return;
-  c.beginPath();
-  c.clearRect(0,0,1200,800);
+  canvas.beginPath();
+  canvas.clearRect(0,0,1200,800);
   vertX=e.pageX-myCanvas.offsetLeft;
   vertY=e.pageY-myCanvas.offsetTop;
   ANG=0;
+
   //hide current shape if cursor is near tools
-  if (vertX<120 && vertY<470) {hideCurrent=true;} else {hideCurrent=false;}
-  if (!(vertX<110 && vertY<460)) checkForLockOn(vertX,vertY); //check to see if we are close enough to lock onto a shape
+  if (vertX<120 && vertY<470) {
+    hideCurrent=true;
+  } else {
+    hideCurrent=false;
+  }
+
+  //check to see if we are close enough to lock onto a shape
+  if (!(vertX<110 && vertY<460)) {
+    checkForLockOn(vertX,vertY);
+  }
+
   drawShapes(shapeCoords,totalShapes,"#AAAAAA","#EEEEEE"); //draw all of the shapes
   var t=totalShapes-1;
+
   if (!legalTiling && legalMode) drawShapes([[shapeCoords[0][t]],[shapeCoords[1][t]],[shapeCoords[2][t]],[shapeCoords[3][t]]],1,"red","red");
+
   //hide shape at cursor if cursor is near controls or we are in deleteShapeMode
   if (!(hideCurrent || deleteShapeMode || highlightMode || fixedHighlightMode)) {
     var s=[[shapeCoords[0][totalShapes]],[shapeCoords[1][totalShapes]],[shapeCoords[2][totalShapes]],[shapeCoords[3][totalShapes]]];
@@ -85,9 +124,11 @@ function moveMouse(e) {
   if (highlightMode) {
     drawShapes(highlightedShapeCoords,totalHighlightedShapes,"#BB0000","#EE0000");
   }
+
   if (totalFixedHighlightedShapes>0) {
     drawFixedHighlightedShapes(fixedHighlightedShapeCoords,totalFixedHighlightedShapes);
   }
+
   if (vertX>10 && vertX<50 && vertY>10 && vertY<50) {
     text="Place a kite";
   } else if (vertX>60 && vertX<100 && vertY>10 && vertY<50) {
@@ -123,13 +164,15 @@ function moveMouse(e) {
   } else {
     text="";
   }
+
   moveShape(ANG,vertX,vertY); //move the current shape to where the cursor is
   drawButtons();
   displayMessage(text);
   finishMove=true;
 }
 
-function checkForLockOn(x,y) { //check to see if we are close enough to lock onto a shape
+//check to see if we are close enough to lock onto a shape
+function checkForLockOn(x,y) {
   var closest=-1;
   var closestDist=10000000;
   for (var i=0; i<totalShapes; i++) {
@@ -250,92 +293,84 @@ function checkForLockOn(x,y) { //check to see if we are close enough to lock ont
   }
 }
 
-function distance(x1,y1,x2,y2) {
-  return Math.sqrt((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2));
-}
-
-function distanceSquared(x1,y1,x2,y2) { //dont use sqrt to save time
-  return ((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2));
-}
-
 function drawButtons() {
-  c.lineWidth=2;
-  c.lineCap="butt";
+  canvas.lineWidth=2;
+  canvas.lineCap="butt";
   //background
-  c.beginPath();
-  c.rect(0,0,110,460)
-  c.fillStyle="#FFFFFF";
-  c.fill();
+  canvas.beginPath();
+  canvas.rect(0,0,110,460)
+  canvas.fillStyle="#FFFFFF";
+  canvas.fill();
   //kite button
-  c.beginPath();
-  c.fillStyle="#FFFFFF";
-  if (drawKiteShape && !deleteShapeMode && !highlightMode && !fixedHighlightMode) {c.fillStyle="#FFCC00";}
-  c.strokeStyle="#000000";
-  c.rect(10,10,40,40);
-  c.fill();
-  c.stroke();
+  canvas.beginPath();
+  canvas.fillStyle="#FFFFFF";
+  if (drawKiteShape && !deleteShapeMode && !highlightMode && !fixedHighlightMode) {canvas.fillStyle="#FFCC00";}
+  canvas.strokeStyle="#000000";
+  canvas.rect(10,10,40,40);
+  canvas.fill();
+  canvas.stroke();
   //dart button
-  c.beginPath();
-  c.rect(60,10,40,40);
-  c.fillStyle="#FFFFFF";
-  if (!drawKiteShape && !deleteShapeMode && !highlightMode && !fixedHighlightMode) {c.fillStyle="#FFCC00";}
-  c.fill();
-  c.stroke();
+  canvas.beginPath();
+  canvas.rect(60,10,40,40);
+  canvas.fillStyle="#FFFFFF";
+  if (!drawKiteShape && !deleteShapeMode && !highlightMode && !fixedHighlightMode) {canvas.fillStyle="#FFCC00";}
+  canvas.fill();
+  canvas.stroke();
   var x=30;
   var y=42;
   //kite
-  c.lineWidth=0.5;
-  c.beginPath();
-  c.moveTo(x,y)
-  c.lineTo(x+25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
-  c.lineTo(x,y-25);
-  c.lineTo(x-25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
-  c.fillStyle="#AAAAAA";
-  c.fill();
-  c.closePath();
-  c.stroke();
+  canvas.lineWidth=0.5;
+  canvas.beginPath();
+  canvas.moveTo(x,y)
+  canvas.lineTo(x+25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
+  canvas.lineTo(x,y-25);
+  canvas.lineTo(x-25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
+  canvas.fillStyle="#AAAAAA";
+  canvas.fill();
+  canvas.closePath();
+  canvas.stroke();
   x=80;
   y=42;
   //dart
-  c.beginPath();
-  c.moveTo(x,y)
-  c.lineTo(x+25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
-  c.lineTo(x,y-25/phi);
-  c.lineTo(x-25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
-  c.closePath();
-  c.fillStyle="#EEEEEE";
-  c.fill();
-  c.stroke();
+  canvas.beginPath();
+  canvas.moveTo(x,y)
+  canvas.lineTo(x+25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
+  canvas.lineTo(x,y-25/phi);
+  canvas.lineTo(x-25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
+  canvas.closePath();
+  canvas.fillStyle="#EEEEEE";
+  canvas.fill();
+  canvas.stroke();
   //deflate
-  c.lineWidth=1;
-  c.beginPath();
-  c.rect(10,60,90,40);
-  c.stroke();
+  canvas.lineWidth=1;
+  canvas.beginPath();
+  canvas.rect(10,60,90,40);
+  canvas.stroke();
   //arrow
   x=46;
   y=80;
-  c.moveTo(x,y-2);
-  c.lineTo(x+10,y-2);
-  c.lineTo(x+10,y-7);
-  c.lineTo(x+17,y);
-  c.lineTo(x+10,y+7);
-  c.lineTo(x+10,y+2);
-  c.lineTo(x,y+2);
-  c.closePath();
-  c.stroke();
-  c.beginPath();
-  c.lineWidth=0.5;
+  canvas.moveTo(x,y-2);
+  canvas.lineTo(x+10,y-2);
+  canvas.lineTo(x+10,y-7);
+  canvas.lineTo(x+17,y);
+  canvas.lineTo(x+10,y+7);
+  canvas.lineTo(x+10,y+2);
+  canvas.lineTo(x,y+2);
+  canvas.closePath();
+  canvas.stroke();
+  canvas.beginPath();
+  canvas.lineWidth=0.5;
   x=30;
   y=92;
-  c.beginPath();
-  c.moveTo(x,y)
-  c.lineTo(x+25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
-  c.lineTo(x,y-25);
-  c.lineTo(x-25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
-  c.closePath();
-  c.fillStyle="#AAAAAA";
-  c.fill();
-  c.stroke();
+  canvas.beginPath();
+  canvas.moveTo(x,y)
+  canvas.lineTo(x+25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
+  canvas.lineTo(x,y-25);
+  canvas.lineTo(x-25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
+  canvas.closePath();
+  canvas.fillStyle="#AAAAAA";
+  canvas.fill();
+  canvas.stroke();
   x=80;
   y=92;
   var SIZE=25;
@@ -366,57 +401,57 @@ function drawButtons() {
     var ang=tempCoords[2][i];
     SIZE=25/phi;
     if (tempCoords[3][i]==0) {//draw a kite
-      c.beginPath();
-      c.fillStyle="#AAAAAA";
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
-      c.fill();
-      c.beginPath();
-      c.strokeStyle="#000000";
-      c.lineWidth=SIZE/50;
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
-      c.closePath();
-      c.stroke();
+      canvas.beginPath();
+      canvas.fillStyle="#AAAAAA";
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
+      canvas.fill();
+      canvas.beginPath();
+      canvas.strokeStyle="#000000";
+      canvas.lineWidth=SIZE/50;
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
+      canvas.closePath();
+      canvas.stroke();
     } else {//draw a dart
-      c.beginPath();
-      c.fillStyle="#EEEEEE";
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
-      c.fill();
-      c.beginPath();
-      c.strokeStyle="#000000";
-      c.lineWidth=SIZE/50;
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
-      c.closePath()
-      c.stroke()
+      canvas.beginPath();
+      canvas.fillStyle="#EEEEEE";
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
+      canvas.fill();
+      canvas.beginPath();
+      canvas.strokeStyle="#000000";
+      canvas.lineWidth=SIZE/50;
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
+      canvas.closePath()
+      canvas.stroke()
     }
   }
-  c.lineWidth=1;
+  canvas.lineWidth=1;
   //inflate
-  c.beginPath();
-  c.rect(10,110,90,40);
-  c.stroke();
+  canvas.beginPath();
+  canvas.rect(10,110,90,40);
+  canvas.stroke();
   x=46;
   y=130;
-  c.moveTo(x,y-2);
-  c.lineTo(x+10,y-2);
-  c.lineTo(x+10,y-7);
-  c.lineTo(x+17,y);
-  c.lineTo(x+10,y+7);
-  c.lineTo(x+10,y+2);
-  c.lineTo(x,y+2);
-  c.closePath();
-  c.stroke();
+  canvas.moveTo(x,y-2);
+  canvas.lineTo(x+10,y-2);
+  canvas.lineTo(x+10,y-7);
+  canvas.lineTo(x+17,y);
+  canvas.lineTo(x+10,y+7);
+  canvas.lineTo(x+10,y+2);
+  canvas.lineTo(x,y+2);
+  canvas.closePath();
+  canvas.stroke();
   x=30;
   y=142;
   var SIZE=25;
@@ -447,248 +482,248 @@ function drawButtons() {
     var ang=tempCoords[2][i];
     SIZE=25/phi;
     if (tempCoords[3][i]==0) {//draw a kite
-      c.beginPath();
-      c.fillStyle="#AAAAAA";
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
-      c.fill();
-      c.beginPath();
-      c.strokeStyle="#000000";
-      c.lineWidth=SIZE/50;
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
-      c.closePath();
-      c.stroke();
+      canvas.beginPath();
+      canvas.fillStyle="#AAAAAA";
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
+      canvas.fill();
+      canvas.beginPath();
+      canvas.strokeStyle="#000000";
+      canvas.lineWidth=SIZE/50;
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
+      canvas.closePath();
+      canvas.stroke();
     } else {//draw a dart
-      c.beginPath();
-      c.fillStyle="#EEEEEE";
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
-      c.fill();
-      c.beginPath();
-      c.strokeStyle="#000000";
-      c.lineWidth=SIZE/50;
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
-      c.closePath()
-      c.stroke()
+      canvas.beginPath();
+      canvas.fillStyle="#EEEEEE";
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
+      canvas.fill();
+      canvas.beginPath();
+      canvas.strokeStyle="#000000";
+      canvas.lineWidth=SIZE/50;
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
+      canvas.closePath()
+      canvas.stroke()
     }
   }
   x=80;
   y=142;
-  c.lineWidth=0.5;
-  c.beginPath();
-  c.moveTo(x,y)
-  c.lineTo(x+25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
-  c.lineTo(x,y-25);
-  c.lineTo(x-25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
-  c.closePath();
-  c.fillStyle="#AAAAAA";
-  c.fill();
-  c.stroke();
-  c.lineWidth=2;
+  canvas.lineWidth=0.5;
+  canvas.beginPath();
+  canvas.moveTo(x,y)
+  canvas.lineTo(x+25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
+  canvas.lineTo(x,y-25);
+  canvas.lineTo(x-25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
+  canvas.closePath();
+  canvas.fillStyle="#AAAAAA";
+  canvas.fill();
+  canvas.stroke();
+  canvas.lineWidth=2;
   //zoom in
-  c.fillStyle="#FFFFFF";
-  c.beginPath();
-  c.rect(10,160,40,40);
-  c.stroke();
-  c.beginPath();
-  c.moveTo(15,195);
-  c.lineWidth=6;
-  c.lineTo(25,185);
-  c.stroke();
-  c.lineWidth=3;
-  c.beginPath();
-  c.arc(30,180,13,0,2*Math.PI);
-  c.fill();
-  c.stroke();
-  c.lineWidth=3;
-  c.beginPath();
-  c.moveTo(30,172);
-  c.lineTo(30,188);
-  c.moveTo(22,180);
-  c.lineTo(38,180);
-  c.stroke();
-  c.lineWidth=2;
+  canvas.fillStyle="#FFFFFF";
+  canvas.beginPath();
+  canvas.rect(10,160,40,40);
+  canvas.stroke();
+  canvas.beginPath();
+  canvas.moveTo(15,195);
+  canvas.lineWidth=6;
+  canvas.lineTo(25,185);
+  canvas.stroke();
+  canvas.lineWidth=3;
+  canvas.beginPath();
+  canvas.arc(30,180,13,0,2*Math.PI);
+  canvas.fill();
+  canvas.stroke();
+  canvas.lineWidth=3;
+  canvas.beginPath();
+  canvas.moveTo(30,172);
+  canvas.lineTo(30,188);
+  canvas.moveTo(22,180);
+  canvas.lineTo(38,180);
+  canvas.stroke();
+  canvas.lineWidth=2;
   //zoom out
-  c.beginPath();
-  c.rect(60,160,40,40);
-  c.stroke();
-  c.beginPath();
-  c.moveTo(65,195);
-  c.lineWidth=6;
-  c.lineTo(75,185);
-  c.stroke();
-  c.lineWidth=3;
-  c.beginPath();
-  c.arc(80,180,13,0,2*Math.PI);
-  c.fill();
-  c.stroke();
-  c.lineWidth=3;
-  c.beginPath();
-  c.moveTo(72,180);
-  c.lineTo(88,180);
-  c.stroke();
-  c.lineWidth=2;
+  canvas.beginPath();
+  canvas.rect(60,160,40,40);
+  canvas.stroke();
+  canvas.beginPath();
+  canvas.moveTo(65,195);
+  canvas.lineWidth=6;
+  canvas.lineTo(75,185);
+  canvas.stroke();
+  canvas.lineWidth=3;
+  canvas.beginPath();
+  canvas.arc(80,180,13,0,2*Math.PI);
+  canvas.fill();
+  canvas.stroke();
+  canvas.lineWidth=3;
+  canvas.beginPath();
+  canvas.moveTo(72,180);
+  canvas.lineTo(88,180);
+  canvas.stroke();
+  canvas.lineWidth=2;
   //center
-  c.beginPath();
-  c.rect(10,210,40,40);
-  c.stroke();
-  c.beginPath();
-  c.lineWidth=3;
-  c.moveTo(15,215);
-  c.lineTo(45,245);
-  c.moveTo(45,215);
-  c.lineTo(15,245);
-  c.stroke();
-  c.beginPath();
-  c.lineWidth=4;
-  c.moveTo(28,218);
-  c.lineTo(28,242);
-  c.moveTo(32,218);
-  c.lineTo(32,242);
-  c.moveTo(18,228);
-  c.lineTo(42,228);
-  c.moveTo(18,232);
-  c.lineTo(42,232);
-  c.stroke();
-  c.lineWidth=3;
-  c.strokeStyle="#FFFFFF"
-  c.beginPath();
-  c.moveTo(18,230);
-  c.lineTo(42,230);
-  c.moveTo(30,218);
-  c.lineTo(30,242);
-  c.stroke();
-  c.lineWidth=2;
-  c.strokeStyle="#000000"
+  canvas.beginPath();
+  canvas.rect(10,210,40,40);
+  canvas.stroke();
+  canvas.beginPath();
+  canvas.lineWidth=3;
+  canvas.moveTo(15,215);
+  canvas.lineTo(45,245);
+  canvas.moveTo(45,215);
+  canvas.lineTo(15,245);
+  canvas.stroke();
+  canvas.beginPath();
+  canvas.lineWidth=4;
+  canvas.moveTo(28,218);
+  canvas.lineTo(28,242);
+  canvas.moveTo(32,218);
+  canvas.lineTo(32,242);
+  canvas.moveTo(18,228);
+  canvas.lineTo(42,228);
+  canvas.moveTo(18,232);
+  canvas.lineTo(42,232);
+  canvas.stroke();
+  canvas.lineWidth=3;
+  canvas.strokeStyle="#FFFFFF"
+  canvas.beginPath();
+  canvas.moveTo(18,230);
+  canvas.lineTo(42,230);
+  canvas.moveTo(30,218);
+  canvas.lineTo(30,242);
+  canvas.stroke();
+  canvas.lineWidth=2;
+  canvas.strokeStyle="#000000"
 
   //show curves
-  c.beginPath();
-  c.rect(60,210,40,40);
-  c.fillStyle="#FFFFFF";
-  if (showCurves) {c.fillStyle="#FFCC00";}
-  c.fill();
-  c.stroke();
+  canvas.beginPath();
+  canvas.rect(60,210,40,40);
+  canvas.fillStyle="#FFFFFF";
+  if (showCurves) {canvas.fillStyle="#FFCC00";}
+  canvas.fill();
+  canvas.stroke();
   //dart
   x=80;
   y=242;
-  c.lineWidth=0.5;
-  c.beginPath();
-  c.moveTo(x,y)
-  c.lineTo(x+25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
-  c.lineTo(x,y-25/phi);
-  c.lineTo(x-25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
-  c.closePath();
-  c.fillStyle="#EEEEEE";
-  c.fill();
-  c.stroke();
+  canvas.lineWidth=0.5;
+  canvas.beginPath();
+  canvas.moveTo(x,y)
+  canvas.lineTo(x+25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
+  canvas.lineTo(x,y-25/phi);
+  canvas.lineTo(x-25*Math.sin(36*Math.PI/180),y-25*Math.cos(36*Math.PI/180));
+  canvas.closePath();
+  canvas.fillStyle="#EEEEEE";
+  canvas.fill();
+  canvas.stroke();
   //draw blue arc
   SIZE=25;
-  c.beginPath()
-  c.strokeStyle="#990000";
-  c.lineWidth=SIZE/25;
-  c.arc(x,y,SIZE*(1-1/phi),(-36-90)*Math.PI/180,(36-90)*Math.PI/180,false)
-  c.stroke();
+  canvas.beginPath()
+  canvas.strokeStyle="#990000";
+  canvas.lineWidth=SIZE/25;
+  canvas.arc(x,y,SIZE*(1-1/phi),(-36-90)*Math.PI/180,(36-90)*Math.PI/180,false)
+  canvas.stroke();
   //draw green arc
   y-=SIZE/phi;
-  c.beginPath()
-  c.strokeStyle="#009900";
-  c.arc(x,y,SIZE/phi*(1-1/phi),-(90-72)*Math.PI/180,-(90+72)*Math.PI/180,false)
-  c.stroke();
-  c.lineWidth=2;
-  c.strokeStyle="#000000"
+  canvas.beginPath()
+  canvas.strokeStyle="#009900";
+  canvas.arc(x,y,SIZE/phi*(1-1/phi),-(90-72)*Math.PI/180,-(90+72)*Math.PI/180,false)
+  canvas.stroke();
+  canvas.lineWidth=2;
+  canvas.strokeStyle="#000000"
 
   //delete shape
-  c.beginPath();
-  c.fillStyle="#FFFFFF";
-  if (deleteShapeMode) {c.fillStyle="#FFCC00";}
-  c.rect(10,260,40,40);
-  c.fill();
-  c.stroke();
+  canvas.beginPath();
+  canvas.fillStyle="#FFFFFF";
+  if (deleteShapeMode) {canvas.fillStyle="#FFCC00";}
+  canvas.rect(10,260,40,40);
+  canvas.fill();
+  canvas.stroke();
 
   //delete one shape
 
-  c.beginPath();
-  c.lineWidth=1;
-  c.moveTo(15,292);
-  c.lineTo(45,292);
-  c.moveTo(16,270);
-  c.lineTo(35,289);
-  c.lineTo(38,289);
-  c.lineTo(43,284);
-  c.lineTo(23,264);
-  c.moveTo(32,286);
-  c.lineTo(39,279);
-  c.stroke();
-  c.closePath();
+  canvas.beginPath();
+  canvas.lineWidth=1;
+  canvas.moveTo(15,292);
+  canvas.lineTo(45,292);
+  canvas.moveTo(16,270);
+  canvas.lineTo(35,289);
+  canvas.lineTo(38,289);
+  canvas.lineTo(43,284);
+  canvas.lineTo(23,264);
+  canvas.moveTo(32,286);
+  canvas.lineTo(39,279);
+  canvas.stroke();
+  canvas.closePath();
 
   //delete all shapes
-  c.lineWidth=2;
-  c.beginPath();
-  c.rect(60,260,40,40);
-  c.stroke();
-  c.beginPath();
-  c.lineWidth=1;
-  c.moveTo(70,265);
-  c.lineTo(70,295);
-  c.lineTo(90,295);
-  c.lineTo(90,270);
-  c.lineTo(85,265);
-  c.lineTo(85,270);
-  c.lineTo(90,270);
-  c.moveTo(85,265);
-  c.lineTo(70,265);
-  c.stroke();
+  canvas.lineWidth=2;
+  canvas.beginPath();
+  canvas.rect(60,260,40,40);
+  canvas.stroke();
+  canvas.beginPath();
+  canvas.lineWidth=1;
+  canvas.moveTo(70,265);
+  canvas.lineTo(70,295);
+  canvas.lineTo(90,295);
+  canvas.lineTo(90,270);
+  canvas.lineTo(85,265);
+  canvas.lineTo(85,270);
+  canvas.lineTo(90,270);
+  canvas.moveTo(85,265);
+  canvas.lineTo(70,265);
+  canvas.stroke();
 
   //rotate left
-  c.lineWidth=2;
-  c.beginPath();
-  c.rect(10,310,40,40);
-  c.stroke();
-  c.beginPath();
-  c.lineWidth=1.5;
-  c.arc(27,342,17,0,3*Math.PI/2,true);
-  c.lineTo(27,318);
-  c.lineTo(17,328);
-  c.lineTo(27,338);
-  c.lineTo(27,331);
-  c.arc(27,342,11,3*Math.PI/2,0,false);
-  c.closePath();
-  c.stroke();
+  canvas.lineWidth=2;
+  canvas.beginPath();
+  canvas.rect(10,310,40,40);
+  canvas.stroke();
+  canvas.beginPath();
+  canvas.lineWidth=1.5;
+  canvas.arc(27,342,17,0,3*Math.PI/2,true);
+  canvas.lineTo(27,318);
+  canvas.lineTo(17,328);
+  canvas.lineTo(27,338);
+  canvas.lineTo(27,331);
+  canvas.arc(27,342,11,3*Math.PI/2,0,false);
+  canvas.closePath();
+  canvas.stroke();
 
   //rotate right
-  c.lineWidth=2;
-  c.beginPath();
-  c.rect(60,310,40,40);
-  c.stroke();
-  c.beginPath();
-  c.lineWidth=1.5;
-  c.arc(84,342,17,Math.PI,3*Math.PI/2,false);
-  c.lineTo(84,318);
-  c.lineTo(94,328);
-  c.lineTo(84,338);
-  c.lineTo(84,330);
-  c.arc(84,342,11,3*Math.PI/2,Math.PI,true);
-  c.closePath()
-  c.stroke();
+  canvas.lineWidth=2;
+  canvas.beginPath();
+  canvas.rect(60,310,40,40);
+  canvas.stroke();
+  canvas.beginPath();
+  canvas.lineWidth=1.5;
+  canvas.arc(84,342,17,Math.PI,3*Math.PI/2,false);
+  canvas.lineTo(84,318);
+  canvas.lineTo(94,328);
+  canvas.lineTo(84,338);
+  canvas.lineTo(84,330);
+  canvas.arc(84,342,11,3*Math.PI/2,Math.PI,true);
+  canvas.closePath()
+  canvas.stroke();
 
   //highlight mode
-  c.lineWidth=2;
-  c.beginPath();
-  c.fillStyle="#FFFFFF";
-  if (highlightMode) {c.fillStyle="#FFCC00";}
-  c.rect(10,360,40,40);
-  c.fill();
-  c.stroke();
+  canvas.lineWidth=2;
+  canvas.beginPath();
+  canvas.fillStyle="#FFFFFF";
+  if (highlightMode) {canvas.fillStyle="#FFCC00";}
+  canvas.rect(10,360,40,40);
+  canvas.fill();
+  canvas.stroke();
 
   x=30;
   y=392;
@@ -720,99 +755,99 @@ function drawButtons() {
     var ang=tempCoords[2][i];
     SIZE=25/phi;
     if (tempCoords[3][i]==0) {//draw a kite
-      c.beginPath();
-      c.fillStyle="#BB0000";
-      if (i==1) c.fillStyle="#00BB00";
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
-      c.fill();
-      c.beginPath();
-      c.strokeStyle="#000000";
-      c.lineWidth=SIZE/50;
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
-      c.closePath();
-      c.stroke();
+      canvas.beginPath();
+      canvas.fillStyle="#BB0000";
+      if (i==1) canvas.fillStyle="#00BB00";
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
+      canvas.fill();
+      canvas.beginPath();
+      canvas.strokeStyle="#000000";
+      canvas.lineWidth=SIZE/50;
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
+      canvas.closePath();
+      canvas.stroke();
     } else {//draw a dart
-      c.beginPath();
-      c.fillStyle="#EEEEEE";
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
-      c.fill();
-      c.beginPath();
-      c.strokeStyle="#000000";
-      c.lineWidth=SIZE/50;
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
-      c.closePath()
-      c.stroke()
+      canvas.beginPath();
+      canvas.fillStyle="#EEEEEE";
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
+      canvas.fill();
+      canvas.beginPath();
+      canvas.strokeStyle="#000000";
+      canvas.lineWidth=SIZE/50;
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
+      canvas.closePath()
+      canvas.stroke()
     }
   }
 
   //force tiles
-  c.lineWidth=2;
-  c.beginPath();
-  c.fillStyle="#FFFFFF";
-  c.rect(60,360,40,40);
-  c.fill();
-  c.stroke();
+  canvas.lineWidth=2;
+  canvas.beginPath();
+  canvas.fillStyle="#FFFFFF";
+  canvas.rect(60,360,40,40);
+  canvas.fill();
+  canvas.stroke();
 
   x=83;
   y=396;
   //dart
-  c.beginPath();
-  c.lineWidth=0.5;
-  c.moveTo(x,y)
-  c.lineTo(x+15*Math.sin(36*Math.PI/180),y-15*Math.cos(36*Math.PI/180));
-  c.lineTo(x,y-15/phi);
-  c.lineTo(x-15*Math.sin(36*Math.PI/180),y-15*Math.cos(36*Math.PI/180));
-  c.closePath();
-  c.fillStyle="#EEEEEE";
-  c.fill();
-  c.stroke();
+  canvas.beginPath();
+  canvas.lineWidth=0.5;
+  canvas.moveTo(x,y)
+  canvas.lineTo(x+15*Math.sin(36*Math.PI/180),y-15*Math.cos(36*Math.PI/180));
+  canvas.lineTo(x,y-15/phi);
+  canvas.lineTo(x-15*Math.sin(36*Math.PI/180),y-15*Math.cos(36*Math.PI/180));
+  canvas.closePath();
+  canvas.fillStyle="#EEEEEE";
+  canvas.fill();
+  canvas.stroke();
   //kite
   x=78;
   y=380;
-  c.beginPath();
-  c.lineWidth=0.5;
-  c.moveTo(x,y)
-  c.lineTo(x,y-15);
-  c.lineTo(x-15*Math.cos(18*Math.PI/180),y-15+15*Math.sin(18*Math.PI/180));
-  c.lineTo(x-15/phi*Math.cos(18*Math.PI/180),y-15/phi*Math.sin(18*Math.PI/180));
-  c.closePath();
-  c.fillStyle="#00AAAA";
-  c.fill();
-  c.stroke();
+  canvas.beginPath();
+  canvas.lineWidth=0.5;
+  canvas.moveTo(x,y)
+  canvas.lineTo(x,y-15);
+  canvas.lineTo(x-15*Math.cos(18*Math.PI/180),y-15+15*Math.sin(18*Math.PI/180));
+  canvas.lineTo(x-15/phi*Math.cos(18*Math.PI/180),y-15/phi*Math.sin(18*Math.PI/180));
+  canvas.closePath();
+  canvas.fillStyle="#00AAAA";
+  canvas.fill();
+  canvas.stroke();
   //kite
   x=83;
   y=387;
-  c.beginPath();
-  c.lineWidth=0.5;
-  c.moveTo(x,y)
-  c.lineTo(x,y-15);
-  c.lineTo(x+15*Math.cos(18*Math.PI/180),y-15+15*Math.sin(18*Math.PI/180));
-  c.lineTo(x+15/phi*Math.cos(18*Math.PI/180),y-15/phi*Math.sin(18*Math.PI/180));
-  c.closePath();
-  c.fillStyle="#AAAAAA";
-  c.fill();
-  c.stroke();
+  canvas.beginPath();
+  canvas.lineWidth=0.5;
+  canvas.moveTo(x,y)
+  canvas.lineTo(x,y-15);
+  canvas.lineTo(x+15*Math.cos(18*Math.PI/180),y-15+15*Math.sin(18*Math.PI/180));
+  canvas.lineTo(x+15/phi*Math.cos(18*Math.PI/180),y-15/phi*Math.sin(18*Math.PI/180));
+  canvas.closePath();
+  canvas.fillStyle="#AAAAAA";
+  canvas.fill();
+  canvas.stroke();
 
   //highlight tiles
-  c.lineWidth=2;
-  c.beginPath();
-  c.fillStyle="#FFFFFF";
-  if (fixedHighlightMode) {c.fillStyle="#FFCC00";}
-  c.rect(10,410,40,40);
-  c.fill();
-  c.stroke();
+  canvas.lineWidth=2;
+  canvas.beginPath();
+  canvas.fillStyle="#FFFFFF";
+  if (fixedHighlightMode) {canvas.fillStyle="#FFCC00";}
+  canvas.rect(10,410,40,40);
+  canvas.fill();
+  canvas.stroke();
   x=30;
   y=442;
   var SIZE=25;
@@ -843,122 +878,122 @@ function drawButtons() {
     var ang=tempCoords[2][i];
     SIZE=25/phi;
     if (tempCoords[3][i]==0) {//draw a kite
-      c.beginPath();
-      c.fillStyle="#AAAAAA";
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
-      c.fill();
-      c.beginPath();
-      c.strokeStyle="#000000";
-      c.lineWidth=SIZE/50;
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
-      c.closePath();
-      c.stroke();
+      canvas.beginPath();
+      canvas.fillStyle="#AAAAAA";
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
+      canvas.fill();
+      canvas.beginPath();
+      canvas.strokeStyle="#000000";
+      canvas.lineWidth=SIZE/50;
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180));
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180),y-SIZE*Math.cos(ang*Math.PI/180));
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180));
+      canvas.closePath();
+      canvas.stroke();
     } else {//draw a dart
-      c.beginPath();
-      c.fillStyle="#EEEEEE";
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
-      c.fill();
-      c.beginPath();
-      c.strokeStyle="#000000";
-      c.lineWidth=SIZE/50;
-      c.moveTo(x,y)
-      c.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
-      c.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
-      c.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
-      c.closePath()
-      c.stroke()
+      canvas.beginPath();
+      canvas.fillStyle="#EEEEEE";
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
+      canvas.fill();
+      canvas.beginPath();
+      canvas.strokeStyle="#000000";
+      canvas.lineWidth=SIZE/50;
+      canvas.moveTo(x,y)
+      canvas.lineTo(x+SIZE*Math.sin((36+ang)*Math.PI/180),y-SIZE*Math.cos((36+ang)*Math.PI/180))
+      canvas.lineTo(x+SIZE*Math.sin(ang*Math.PI/180)/phi,y-SIZE*Math.cos(ang*Math.PI/180)/phi)
+      canvas.lineTo(x-SIZE*Math.sin((36-ang)*Math.PI/180),y-SIZE*Math.cos((36-ang)*Math.PI/180))
+      canvas.closePath()
+      canvas.stroke()
     }
   }
-  c.beginPath();
-  c.lineWidth=1.5;
-  c.strokeStyle="#0000EE"
-  c.moveTo(tempCoords[0][3],tempCoords[1][3]);
-  c.lineTo(tempCoords[0][3]+SIZE*Math.sin((36+tempCoords[2][3])*Math.PI/180),tempCoords[1][3]-SIZE*Math.cos((36+tempCoords[2][3])*Math.PI/180));
-  c.lineTo(tempCoords[0][3]+SIZE*Math.sin(tempCoords[2][3]*Math.PI/180)/phi,tempCoords[1][3]-SIZE*Math.cos(tempCoords[2][3]*Math.PI/180)/phi);
-  c.lineTo(tempCoords[0][3]+SIZE*Math.sin((36-tempCoords[2][3])*Math.PI/180),tempCoords[1][3]-SIZE*Math.cos((36-tempCoords[2][3])*Math.PI/180));
-  c.lineTo(tempCoords[0][3]+SIZE*phi*Math.sin((36-tempCoords[2][3])*Math.PI/180),tempCoords[1][3]-SIZE*phi*Math.cos((36-tempCoords[2][3])*Math.PI/180));
-  c.lineTo(tempCoords[0][1],tempCoords[1][1]);
-  c.lineTo(tempCoords[0][2]+SIZE*Math.sin(tempCoords[2][2]*Math.PI/180)/phi,tempCoords[1][2]-SIZE*Math.cos(tempCoords[2][2]*Math.PI/180)/phi);
-  c.lineTo(tempCoords[0][2]+SIZE*Math.sin((tempCoords[2][2]-36)*Math.PI/180),tempCoords[1][2]-SIZE*Math.cos((tempCoords[2][2]-36)*Math.PI/180));
-  c.closePath();
-  c.stroke();
+  canvas.beginPath();
+  canvas.lineWidth=1.5;
+  canvas.strokeStyle="#0000EE"
+  canvas.moveTo(tempCoords[0][3],tempCoords[1][3]);
+  canvas.lineTo(tempCoords[0][3]+SIZE*Math.sin((36+tempCoords[2][3])*Math.PI/180),tempCoords[1][3]-SIZE*Math.cos((36+tempCoords[2][3])*Math.PI/180));
+  canvas.lineTo(tempCoords[0][3]+SIZE*Math.sin(tempCoords[2][3]*Math.PI/180)/phi,tempCoords[1][3]-SIZE*Math.cos(tempCoords[2][3]*Math.PI/180)/phi);
+  canvas.lineTo(tempCoords[0][3]+SIZE*Math.sin((36-tempCoords[2][3])*Math.PI/180),tempCoords[1][3]-SIZE*Math.cos((36-tempCoords[2][3])*Math.PI/180));
+  canvas.lineTo(tempCoords[0][3]+SIZE*phi*Math.sin((36-tempCoords[2][3])*Math.PI/180),tempCoords[1][3]-SIZE*phi*Math.cos((36-tempCoords[2][3])*Math.PI/180));
+  canvas.lineTo(tempCoords[0][1],tempCoords[1][1]);
+  canvas.lineTo(tempCoords[0][2]+SIZE*Math.sin(tempCoords[2][2]*Math.PI/180)/phi,tempCoords[1][2]-SIZE*Math.cos(tempCoords[2][2]*Math.PI/180)/phi);
+  canvas.lineTo(tempCoords[0][2]+SIZE*Math.sin((tempCoords[2][2]-36)*Math.PI/180),tempCoords[1][2]-SIZE*Math.cos((tempCoords[2][2]-36)*Math.PI/180));
+  canvas.closePath();
+  canvas.stroke();
 
   //legal mode
-  c.strokeStyle="#000000"
-  c.lineWidth=2;
-  c.beginPath();
-  c.fillStyle="#FFFFFF";
-  if (legalMode) {c.fillStyle="#FFCC00";}
-  c.rect(60,410,40,40);
-  c.fill();
-  c.stroke();
+  canvas.strokeStyle="#000000"
+  canvas.lineWidth=2;
+  canvas.beginPath();
+  canvas.fillStyle="#FFFFFF";
+  if (legalMode) {canvas.fillStyle="#FFCC00";}
+  canvas.rect(60,410,40,40);
+  canvas.fill();
+  canvas.stroke();
 
   x=80;
   y=443;
   //dart
-  c.beginPath();
-  c.lineWidth=0.5;
-  c.moveTo(x,y)
-  c.lineTo(x+15*Math.sin(36*Math.PI/180),y-15*Math.cos(36*Math.PI/180));
-  c.lineTo(x,y-15/phi);
-  c.lineTo(x-15*Math.sin(36*Math.PI/180),y-15*Math.cos(36*Math.PI/180));
-  c.closePath();
-  c.fillStyle="#EEEEEE";
-  c.fill();
-  c.stroke();
+  canvas.beginPath();
+  canvas.lineWidth=0.5;
+  canvas.moveTo(x,y)
+  canvas.lineTo(x+15*Math.sin(36*Math.PI/180),y-15*Math.cos(36*Math.PI/180));
+  canvas.lineTo(x,y-15/phi);
+  canvas.lineTo(x-15*Math.sin(36*Math.PI/180),y-15*Math.cos(36*Math.PI/180));
+  canvas.closePath();
+  canvas.fillStyle="#EEEEEE";
+  canvas.fill();
+  canvas.stroke();
   //kite
   x=80;
   y=433;
-  c.beginPath();
-  c.lineWidth=0.5;
-  c.moveTo(x,y)
-  c.lineTo(x,y-15);
-  c.lineTo(x-15/phi*Math.cos(54*Math.PI/180),y-15/phi*Math.sin(54*Math.PI/180));
-  c.lineTo(x-15*Math.cos(18*Math.PI/180),y-15*Math.sin(18*Math.PI/180));
-  c.closePath();
-  c.fillStyle="#EE0000";
-  c.fill();
-  c.stroke();
+  canvas.beginPath();
+  canvas.lineWidth=0.5;
+  canvas.moveTo(x,y)
+  canvas.lineTo(x,y-15);
+  canvas.lineTo(x-15/phi*Math.cos(54*Math.PI/180),y-15/phi*Math.sin(54*Math.PI/180));
+  canvas.lineTo(x-15*Math.cos(18*Math.PI/180),y-15*Math.sin(18*Math.PI/180));
+  canvas.closePath();
+  canvas.fillStyle="#EE0000";
+  canvas.fill();
+  canvas.stroke();
   //kite
   x=80;
   y=434;
-  c.beginPath();
-  c.lineWidth=0.5;
-  c.moveTo(x,y)
-  c.lineTo(x,y-15);
-  c.lineTo(x+15*Math.cos(18*Math.PI/180),y-15+15*Math.sin(18*Math.PI/180));
-  c.lineTo(x+15/phi*Math.cos(18*Math.PI/180),y-15/phi*Math.sin(18*Math.PI/180));
-  c.closePath();
-  c.fillStyle="#AAAAAA";
-  c.fill();
-  c.stroke();
-  c.lineWidth=1;
-  c.fillStyle="#CCCCCC";
-  c.font = "15px Times";
-  c.textBaseline="middle";
-  c.fillText("Created by Kevin Bertman",1010,20);
+  canvas.beginPath();
+  canvas.lineWidth=0.5;
+  canvas.moveTo(x,y)
+  canvas.lineTo(x,y-15);
+  canvas.lineTo(x+15*Math.cos(18*Math.PI/180),y-15+15*Math.sin(18*Math.PI/180));
+  canvas.lineTo(x+15/phi*Math.cos(18*Math.PI/180),y-15/phi*Math.sin(18*Math.PI/180));
+  canvas.closePath();
+  canvas.fillStyle="#AAAAAA";
+  canvas.fill();
+  canvas.stroke();
+  canvas.lineWidth=1;
+  canvas.fillStyle="#CCCCCC";
+  canvas.font = "15px Times";
+  canvas.textBaseline="middle";
+  canvas.fillText("Created by Kevin Bertman",1010,20);
 }
 
 function displayMessage(message) {
-  c.lineWidth=1;
-  c.beginPath();
-  c.fillStyle="#DDDDDD";
-  c.rect(780,670,420,30);
-  c.fill();
-  c.stroke();
-  c.fillStyle="#000000";
-  c.font = "15px Times";
-  c.textBaseline="middle";
-  c.fillText(message,790,685);
+  canvas.lineWidth=1;
+  canvas.beginPath();
+  canvas.fillStyle="#DDDDDD";
+  canvas.rect(780,670,420,30);
+  canvas.fill();
+  canvas.stroke();
+  canvas.fillStyle="#000000";
+  canvas.font = "15px Times";
+  canvas.textBaseline="middle";
+  canvas.fillText(message,790,685);
 }
 
 function mouseDown(e) {
@@ -1116,8 +1151,8 @@ function mouseDown(e) {
   else if (highlightMode && !fixedHighlightMode && !(mX<110 && mY<460)) {highlight(mX,mY); updateScreen=true;}
   else if (fixedHighlightMode && !(mX<110 && mY<460)) {fixedHighlight(mX,mY); updateScreen=true;}
   if (updateScreen) {
-    c.beginPath();
-    c.clearRect(0,0,1200,800);
+    canvas.beginPath();
+    canvas.clearRect(0,0,1200,800);
     drawShapes(shapeCoords,totalShapes,"#AAAAAA","#EEEEEE");
     if (highlightMode) {
       drawShapes(highlightedShapeCoords,totalHighlightedShapes,"#BB0000","#EE0000");
@@ -2768,7 +2803,7 @@ function addForcedTiles() {
                                                                                                                                             routeInfo[i][3*j+2]=nextV;//the edge that leads to the next shape
                                                                                                                                           }
                                                                                                                                         }
-                                                                                                                                        //now we have a list of routes of the form shape type, edge to next shape, shape type, edge to next shape etc.
+                                                                                                                                        //now we have a list of routes of the form shape type, edge to next shape, shape type, edge to next shape etcanvas.
                                                                                                                                         var currentIndex=[];
                                                                                                                                         var closest=100000000000;
                                                                                                                                         //now we need to search the other tiles to see if this is a subset
@@ -3128,7 +3163,7 @@ function addForcedTiles() {
                                                                                                                                                         routeInfo[i][3*j+2]=nextV;//the edge that leads to the next shape
                                                                                                                                                       }
                                                                                                                                                     }
-                                                                                                                                                    //now we have a list of routes of the form shape type, edge to next shape, shape type, edge to next shape etc.
+                                                                                                                                                    //now we have a list of routes of the form shape type, edge to next shape, shape type, edge to next shape etcanvas.
                                                                                                                                                     var currentIndex=[];
                                                                                                                                                     var closest=100000000000;
                                                                                                                                                     //now we need to search the other tiles to see if this is a subset
@@ -3288,7 +3323,7 @@ function addForcedTiles() {
                                                                                                                                                         routeInfo[i][3*j+2]=nextV;//the edge that leads to the next shape
                                                                                                                                                       }
                                                                                                                                                     }
-                                                                                                                                                    //now we have a list of routes of the form shape type, edge to next shape, shape type, edge to next shape etc.
+                                                                                                                                                    //now we have a list of routes of the form shape type, edge to next shape, shape type, edge to next shape etcanvas.
 
                                                                                                                                                     var currentIndex=[];
                                                                                                                                                     var closest=100000000000;
@@ -3705,15 +3740,15 @@ function mapShapes(coords,total,length) { //make a record of each shape's neighb
                                   vertices[1][i]=tempVertices[1][i];
                                 }
 
-                                /*c.beginPath(); //show the bounding polygon
-                                c.strokeStyle="red";
-                                c.moveTo(vertices[0][0],vertices[1][0]);
+                                /*canvas.beginPath(); //show the bounding polygon
+                                canvas.strokeStyle="red";
+                                canvas.moveTo(vertices[0][0],vertices[1][0]);
                                 for (var i=1; i<IND; i++) {
-                                  c.lineTo(vertices[0][i],vertices[1][i]);
+                                  canvas.lineTo(vertices[0][i],vertices[1][i]);
                                 }
-                                c.lineTo(vertices[0][0],vertices[1][0]);
-                                c.stroke();
-                                c.closePath();*/
+                                canvas.lineTo(vertices[0][0],vertices[1][0]);
+                                canvas.stroke();
+                                canvas.closePath();*/
 
 
                                 var smallestR=1000000000;
@@ -3743,12 +3778,12 @@ function mapShapes(coords,total,length) { //make a record of each shape's neighb
                                 //if the smallest circle contains only two points no need to continue
                                 if (smallestR<1000000000) {
                                   if (drawCircle) {
-                                    c.beginPath();
-                                    c.lineWidth=size/20;
-                                    c.strokeStyle=color;
-                                    c.arc((vertices[0][index1]+vertices[0][index2])*0.5,(vertices[1][index1]+vertices[1][index2])*0.5,Math.sqrt(smallestR),0,Math.PI*2,true);
-                                    c.stroke();
-                                    c.closePath();
+                                    canvas.beginPath();
+                                    canvas.lineWidth=size/20;
+                                    canvas.strokeStyle=color;
+                                    canvas.arc((vertices[0][index1]+vertices[0][index2])*0.5,(vertices[1][index1]+vertices[1][index2])*0.5,Math.sqrt(smallestR),0,Math.PI*2,true);
+                                    canvas.stroke();
+                                    canvas.closePath();
                                   }
                                   var D=Math.round((Math.sqrt(smallestR)*2000)/size)/1000;
                                   //return the centre of the tiling and the diameter
@@ -3809,12 +3844,12 @@ function mapShapes(coords,total,length) { //make a record of each shape's neighb
                                   }
                                 }
                                 if (drawCircle) {
-                                  c.beginPath();
-                                  c.lineWidth=size/20;
-                                  c.strokeStyle=color;
-                                  c.arc(centreXSmallest,centreYSmallest,Math.sqrt(smallestR),0,Math.PI*2,true);
-                                  c.stroke();
-                                  c.closePath();
+                                  canvas.beginPath();
+                                  canvas.lineWidth=size/20;
+                                  canvas.strokeStyle=color;
+                                  canvas.arc(centreXSmallest,centreYSmallest,Math.sqrt(smallestR),0,Math.PI*2,true);
+                                  canvas.stroke();
+                                  canvas.closePath();
                                 }
                                 var D=Math.round(Math.sqrt(smallestR)*2000)/1000
                                 var D=Math.round((Math.sqrt(smallestR)*2000)/size)/1000;
@@ -4150,8 +4185,8 @@ function mapShapes(coords,total,length) { //make a record of each shape's neighb
 
                                           function drawShapes(coords,total,col1,col2) {//draw all of the shapes
                                             //if (0==total && (hideCurrent || deleteShapeMode || highlightMode)) return;
-                                            c.beginPath();
-                                            c.fillStyle=col1;
+                                            canvas.beginPath();
+                                            canvas.fillStyle=col1;
                                             //fill kites
                                             for (var i=0; i<total; i++) {
                                               //hide shape at cursor if cursor is near controls or we are in deleteShapeMode
@@ -4160,34 +4195,34 @@ function mapShapes(coords,total,length) { //make a record of each shape's neighb
                                               var y=coords[1][i];
                                               var ang=coords[2][i];
                                               if (coords[3][i]==0) {//draw a kite
-                                                c.moveTo(x,y)
-                                                c.lineTo(x+size*Math.sin((36+ang)*Math.PI/180),y-size*Math.cos((36+ang)*Math.PI/180));
-                                                c.lineTo(x+size*Math.sin(ang*Math.PI/180),y-size*Math.cos(ang*Math.PI/180));
-                                                c.lineTo(x-size*Math.sin((36-ang)*Math.PI/180),y-size*Math.cos((36-ang)*Math.PI/180));
+                                                canvas.moveTo(x,y)
+                                                canvas.lineTo(x+size*Math.sin((36+ang)*Math.PI/180),y-size*Math.cos((36+ang)*Math.PI/180));
+                                                canvas.lineTo(x+size*Math.sin(ang*Math.PI/180),y-size*Math.cos(ang*Math.PI/180));
+                                                canvas.lineTo(x-size*Math.sin((36-ang)*Math.PI/180),y-size*Math.cos((36-ang)*Math.PI/180));
                                               }
                                             }
-                                            c.fill();
-                                            c.closePath();
-                                            c.beginPath();
-                                            c.fillStyle=col2;
+                                            canvas.fill();
+                                            canvas.closePath();
+                                            canvas.beginPath();
+                                            canvas.fillStyle=col2;
                                             //fill darts
                                             for (var i=0; i<total; i++) {
                                               var x=coords[0][i];
                                               var y=coords[1][i];
                                               var ang=coords[2][i];
                                               if (coords[3][i]==1)  {//draw a dart
-                                                c.moveTo(x,y)
-                                                c.lineTo(x+size*Math.sin((36+ang)*Math.PI/180),y-size*Math.cos((36+ang)*Math.PI/180))
-                                                c.lineTo(x+size*Math.sin(ang*Math.PI/180)/phi,y-size*Math.cos(ang*Math.PI/180)/phi)
-                                                c.lineTo(x-size*Math.sin((36-ang)*Math.PI/180),y-size*Math.cos((36-ang)*Math.PI/180))
+                                                canvas.moveTo(x,y)
+                                                canvas.lineTo(x+size*Math.sin((36+ang)*Math.PI/180),y-size*Math.cos((36+ang)*Math.PI/180))
+                                                canvas.lineTo(x+size*Math.sin(ang*Math.PI/180)/phi,y-size*Math.cos(ang*Math.PI/180)/phi)
+                                                canvas.lineTo(x-size*Math.sin((36-ang)*Math.PI/180),y-size*Math.cos((36-ang)*Math.PI/180))
                                               }
                                             }
-                                            c.fill();
-                                            c.closePath();
+                                            canvas.fill();
+                                            canvas.closePath();
 
-                                            c.beginPath();
-                                            c.strokeStyle="#990000";
-                                            c.lineWidth=size/25;
+                                            canvas.beginPath();
+                                            canvas.strokeStyle="#990000";
+                                            canvas.lineWidth=size/25;
                                             for (var i=0; i<total; i++) {
                                               var x=coords[0][i];
                                               var y=coords[1][i];
@@ -4195,22 +4230,22 @@ function mapShapes(coords,total,length) { //make a record of each shape's neighb
                                               if (coords[3][i]==0) {//draw a kite
                                                 if (showCurves) {
                                                   //draw red arc
-                                                  c.moveTo(x+size/phi*Math.cos((ang-36-90)*Math.PI/180),y+size/phi*Math.sin((ang-36-90)*Math.PI/180));
-                                                  c.arc(x,y,size/phi,(ang-36-90)*Math.PI/180,(ang+36-90)*Math.PI/180,false)
+                                                  canvas.moveTo(x+size/phi*Math.cos((ang-36-90)*Math.PI/180),y+size/phi*Math.sin((ang-36-90)*Math.PI/180));
+                                                  canvas.arc(x,y,size/phi,(ang-36-90)*Math.PI/180,(ang+36-90)*Math.PI/180,false)
                                                 }
                                               } else {//draw a dart
                                                 if (showCurves) {
                                                   //draw red arc
-                                                  c.moveTo(x+size*(1-1/phi)*Math.cos((ang-36-90)*Math.PI/180),y+size*(1-1/phi)*Math.sin((ang-36-90)*Math.PI/180));
-                                                  c.arc(x,y,size*(1-1/phi),(ang-36-90)*Math.PI/180,(ang+36-90)*Math.PI/180,false)
+                                                  canvas.moveTo(x+size*(1-1/phi)*Math.cos((ang-36-90)*Math.PI/180),y+size*(1-1/phi)*Math.sin((ang-36-90)*Math.PI/180));
+                                                  canvas.arc(x,y,size*(1-1/phi),(ang-36-90)*Math.PI/180,(ang+36-90)*Math.PI/180,false)
                                                 }
                                               }
                                             }
-                                            c.stroke();
-                                            c.closePath();
+                                            canvas.stroke();
+                                            canvas.closePath();
                                             //draw arcs
-                                            c.beginPath();
-                                            c.strokeStyle="#009900";
+                                            canvas.beginPath();
+                                            canvas.strokeStyle="#009900";
                                             for (var i=0; i<total; i++) {
                                               var x=coords[0][i];
                                               var y=coords[1][i];
@@ -4220,8 +4255,8 @@ function mapShapes(coords,total,length) { //make a record of each shape's neighb
                                                   //draw green arc
                                                   x+=size*Math.sin(coords[2][i]*Math.PI/180);
                                                   y-=size*Math.cos(coords[2][i]*Math.PI/180);
-                                                  c.moveTo(x+size/(phi*phi)*Math.cos(-(90-ang-108)*Math.PI/180),y+size/(phi*phi)*Math.sin(-(90-ang-108)*Math.PI/180));
-                                                  c.arc(x,y,size/(phi*phi),-(90-ang-108)*Math.PI/180,-(90-ang+108)*Math.PI/180,false)
+                                                  canvas.moveTo(x+size/(phi*phi)*Math.cos(-(90-ang-108)*Math.PI/180),y+size/(phi*phi)*Math.sin(-(90-ang-108)*Math.PI/180));
+                                                  canvas.arc(x,y,size/(phi*phi),-(90-ang-108)*Math.PI/180,-(90-ang+108)*Math.PI/180,false)
                                                   x-=size*Math.sin(coords[2][i]*Math.PI/180);
                                                   y+=size*Math.cos(coords[2][i]*Math.PI/180);
                                                 }
@@ -4230,73 +4265,73 @@ function mapShapes(coords,total,length) { //make a record of each shape's neighb
                                                   //draw green arc
                                                   x+=size/phi*Math.sin(coords[2][i]*Math.PI/180);
                                                   y-=size/phi*Math.cos(coords[2][i]*Math.PI/180);
-                                                  c.moveTo(x+size/phi*(1-1/phi)*Math.cos(-(90-ang-72)*Math.PI/180),y+size/phi*(1-1/phi)*Math.sin(-(90-ang-72)*Math.PI/180));
-                                                  c.arc(x,y,size/phi*(1-1/phi),-(90-ang-72)*Math.PI/180,-(90-ang+72)*Math.PI/180,false)
+                                                  canvas.moveTo(x+size/phi*(1-1/phi)*Math.cos(-(90-ang-72)*Math.PI/180),y+size/phi*(1-1/phi)*Math.sin(-(90-ang-72)*Math.PI/180));
+                                                  canvas.arc(x,y,size/phi*(1-1/phi),-(90-ang-72)*Math.PI/180,-(90-ang+72)*Math.PI/180,false)
                                                   x-=size/phi*Math.sin(coords[2][i]*Math.PI/180);
                                                   y+=size/phi*Math.cos(coords[2][i]*Math.PI/180);
                                                 }
                                               }
                                             }
-                                            c.stroke();
-                                            c.closePath();
-                                            c.beginPath();
-                                            c.strokeStyle="#000000";
-                                            c.lineWidth=size/50;
+                                            canvas.stroke();
+                                            canvas.closePath();
+                                            canvas.beginPath();
+                                            canvas.strokeStyle="#000000";
+                                            canvas.lineWidth=size/50;
                                             //draw the outlines
                                             for (var i=0; i<total; i++) {
                                               var x=coords[0][i];
                                               var y=coords[1][i];
                                               var ang=coords[2][i];
                                               if (coords[3][i]==0) {//draw a kite
-                                                c.moveTo(x,y)
-                                                c.lineTo(x+size*Math.sin((36+ang)*Math.PI/180),y-size*Math.cos((36+ang)*Math.PI/180));
-                                                c.lineTo(x+size*Math.sin(ang*Math.PI/180),y-size*Math.cos(ang*Math.PI/180));
-                                                c.lineTo(x-size*Math.sin((36-ang)*Math.PI/180),y-size*Math.cos((36-ang)*Math.PI/180));
-                                                c.lineTo(x,y);
+                                                canvas.moveTo(x,y)
+                                                canvas.lineTo(x+size*Math.sin((36+ang)*Math.PI/180),y-size*Math.cos((36+ang)*Math.PI/180));
+                                                canvas.lineTo(x+size*Math.sin(ang*Math.PI/180),y-size*Math.cos(ang*Math.PI/180));
+                                                canvas.lineTo(x-size*Math.sin((36-ang)*Math.PI/180),y-size*Math.cos((36-ang)*Math.PI/180));
+                                                canvas.lineTo(x,y);
                                               } else {//draw a dart
-                                                c.moveTo(x,y)
-                                                c.lineTo(x+size*Math.sin((36+ang)*Math.PI/180),y-size*Math.cos((36+ang)*Math.PI/180))
-                                                c.lineTo(x+size*Math.sin(ang*Math.PI/180)/phi,y-size*Math.cos(ang*Math.PI/180)/phi)
-                                                c.lineTo(x-size*Math.sin((36-ang)*Math.PI/180),y-size*Math.cos((36-ang)*Math.PI/180))
-                                                c.lineTo(x,y);
+                                                canvas.moveTo(x,y)
+                                                canvas.lineTo(x+size*Math.sin((36+ang)*Math.PI/180),y-size*Math.cos((36+ang)*Math.PI/180))
+                                                canvas.lineTo(x+size*Math.sin(ang*Math.PI/180)/phi,y-size*Math.cos(ang*Math.PI/180)/phi)
+                                                canvas.lineTo(x-size*Math.sin((36-ang)*Math.PI/180),y-size*Math.cos((36-ang)*Math.PI/180))
+                                                canvas.lineTo(x,y);
                                               }
                                             }
-                                            c.stroke();
-                                            c.closePath();
+                                            canvas.stroke();
+                                            canvas.closePath();
                                           }
 
                                           function drawFixedHighlightedShapes(coords,total) {//draw all of the shapes
-                                            c.beginPath();
-                                            c.strokeStyle="#0000EE";
-                                            c.lineCap="round";
-                                            c.lineWidth=coords[4][0]/15;
+                                            canvas.beginPath();
+                                            canvas.strokeStyle="#0000EE";
+                                            canvas.lineCap="round";
+                                            canvas.lineWidth=coords[4][0]/15;
                                             //draw the outlines
                                             for (var i=0; i<total; i++) {
                                               var x=coords[0][i];
                                               var y=coords[1][i];
                                               var ang=coords[2][i];
                                               if (coords[3][i]==0) {//draw a kite
-                                                c.moveTo(x,y)
-                                                if (fixedHighlightedShapeMap[0][i]==-1) {c.lineTo(x+coords[4][i]*Math.sin((36+ang)*Math.PI/180),y-coords[4][i]*Math.cos((36+ang)*Math.PI/180));}
-                                                c.moveTo(x+coords[4][i]*Math.sin((36+ang)*Math.PI/180),y-coords[4][i]*Math.cos((36+ang)*Math.PI/180));
-                                                if (fixedHighlightedShapeMap[1][i]==-1) {c.lineTo(x+coords[4][i]*Math.sin(ang*Math.PI/180),y-coords[4][i]*Math.cos(ang*Math.PI/180));}
-                                                c.moveTo(x+coords[4][i]*Math.sin(ang*Math.PI/180),y-coords[4][i]*Math.cos(ang*Math.PI/180));
-                                                if (fixedHighlightedShapeMap[2][i]==-1) {c.lineTo(x-coords[4][i]*Math.sin((36-ang)*Math.PI/180),y-coords[4][i]*Math.cos((36-ang)*Math.PI/180));}
-                                                c.moveTo(x-coords[4][i]*Math.sin((36-ang)*Math.PI/180),y-coords[4][i]*Math.cos((36-ang)*Math.PI/180));
-                                                if (fixedHighlightedShapeMap[3][i]==-1) {c.lineTo(x,y);}
+                                                canvas.moveTo(x,y)
+                                                if (fixedHighlightedShapeMap[0][i]==-1) {canvas.lineTo(x+coords[4][i]*Math.sin((36+ang)*Math.PI/180),y-coords[4][i]*Math.cos((36+ang)*Math.PI/180));}
+                                                canvas.moveTo(x+coords[4][i]*Math.sin((36+ang)*Math.PI/180),y-coords[4][i]*Math.cos((36+ang)*Math.PI/180));
+                                                if (fixedHighlightedShapeMap[1][i]==-1) {canvas.lineTo(x+coords[4][i]*Math.sin(ang*Math.PI/180),y-coords[4][i]*Math.cos(ang*Math.PI/180));}
+                                                canvas.moveTo(x+coords[4][i]*Math.sin(ang*Math.PI/180),y-coords[4][i]*Math.cos(ang*Math.PI/180));
+                                                if (fixedHighlightedShapeMap[2][i]==-1) {canvas.lineTo(x-coords[4][i]*Math.sin((36-ang)*Math.PI/180),y-coords[4][i]*Math.cos((36-ang)*Math.PI/180));}
+                                                canvas.moveTo(x-coords[4][i]*Math.sin((36-ang)*Math.PI/180),y-coords[4][i]*Math.cos((36-ang)*Math.PI/180));
+                                                if (fixedHighlightedShapeMap[3][i]==-1) {canvas.lineTo(x,y);}
                                               } else {//draw a dart
-                                                c.moveTo(x,y)
-                                                if (fixedHighlightedShapeMap[0][i]==-1) {c.lineTo(x+coords[4][i]*Math.sin((36+ang)*Math.PI/180),y-coords[4][i]*Math.cos((36+ang)*Math.PI/180));}
-                                                c.moveTo(x+coords[4][i]*Math.sin((36+ang)*Math.PI/180),y-coords[4][i]*Math.cos((36+ang)*Math.PI/180));
-                                                if (fixedHighlightedShapeMap[1][i]==-1) {c.lineTo(x+coords[4][i]*Math.sin(ang*Math.PI/180)/phi,y-coords[4][i]*Math.cos(ang*Math.PI/180)/phi);}
-                                                c.moveTo(x+coords[4][i]*Math.sin(ang*Math.PI/180)/phi,y-coords[4][i]*Math.cos(ang*Math.PI/180)/phi);
-                                                if (fixedHighlightedShapeMap[2][i]==-1) {c.lineTo(x-coords[4][i]*Math.sin((36-ang)*Math.PI/180),y-coords[4][i]*Math.cos((36-ang)*Math.PI/180));}
-                                                c.moveTo(x-coords[4][i]*Math.sin((36-ang)*Math.PI/180),y-coords[4][i]*Math.cos((36-ang)*Math.PI/180));
-                                                if (fixedHighlightedShapeMap[3][i]==-1) c.lineTo(x,y);
+                                                canvas.moveTo(x,y)
+                                                if (fixedHighlightedShapeMap[0][i]==-1) {canvas.lineTo(x+coords[4][i]*Math.sin((36+ang)*Math.PI/180),y-coords[4][i]*Math.cos((36+ang)*Math.PI/180));}
+                                                canvas.moveTo(x+coords[4][i]*Math.sin((36+ang)*Math.PI/180),y-coords[4][i]*Math.cos((36+ang)*Math.PI/180));
+                                                if (fixedHighlightedShapeMap[1][i]==-1) {canvas.lineTo(x+coords[4][i]*Math.sin(ang*Math.PI/180)/phi,y-coords[4][i]*Math.cos(ang*Math.PI/180)/phi);}
+                                                canvas.moveTo(x+coords[4][i]*Math.sin(ang*Math.PI/180)/phi,y-coords[4][i]*Math.cos(ang*Math.PI/180)/phi);
+                                                if (fixedHighlightedShapeMap[2][i]==-1) {canvas.lineTo(x-coords[4][i]*Math.sin((36-ang)*Math.PI/180),y-coords[4][i]*Math.cos((36-ang)*Math.PI/180));}
+                                                canvas.moveTo(x-coords[4][i]*Math.sin((36-ang)*Math.PI/180),y-coords[4][i]*Math.cos((36-ang)*Math.PI/180));
+                                                if (fixedHighlightedShapeMap[3][i]==-1) canvas.lineTo(x,y);
                                               }
                                             }
-                                            c.stroke();
-                                            c.closePath();
+                                            canvas.stroke();
+                                            canvas.closePath();
                                           }
 
 
